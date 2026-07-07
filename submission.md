@@ -240,3 +240,36 @@ and `isoweekday()` after I had already localized the bug to the weekday comparis
 verified the return values myself in a REPL before committing.
 
 _Fix committed separately on `bugfix/mixtape` (see `git log`)._
+
+### Issue #2 — Friends Listening Now shows people from yesterday
+
+**How I reproduced it.** Called `feed_service.get_friends_listening_now(nova.id)` against
+the seeded DB. nova's *listening-now* feed returned friends whose most recent listen was
+**31 and 36 minutes ago** — not "now." The seed script explicitly comments that its
+"recent" events (10–20 min ago) should appear and its "older" events (hours-to-days ago)
+should not, so surfacing half-hour-plus-old activity confirmed the bug.
+
+**How I found the root cause.** Traced `GET /feed/<user_id>/listening-now`
+(`routes/feed.py`) → `get_friends_listening_now` in `services/feed_service.py`. The query
+filters `ListeningEvent.listened_at >= cutoff`, where `cutoff = now - RECENT_THRESHOLD`.
+The module-level constant read `RECENT_THRESHOLD = timedelta(hours=24)`. That single line
+is the whole cause: a feed labelled "listening **now**" was admitting a full day of
+history.
+
+**The root cause.** `RECENT_THRESHOLD` was `timedelta(hours=24)`. "Friends Listening Now"
+is meant to show who is *currently* listening, but a 24-hour cutoff includes everything
+from the previous day — hence "people from yesterday." The recency window was simply set
+far too wide for the feature's meaning.
+
+**My fix and side-effect check.** Changed `RECENT_THRESHOLD` to `timedelta(minutes=30)`,
+matching the seed data's own definition of "recent." Verified with controlled events for
+nova's friends at 5, 25, and 90 minutes ago: the 5- and 25-minute friends appear and the
+90-minute friend is excluded — correct on both sides of the boundary. I also confirmed
+`get_activity_feed` still returns all three friends, since it intentionally applies no
+recency filter and shares no code with the threshold — so the general activity feed is
+unaffected.
+
+**AI use:** none specific to this bug beyond the general orientation pass; the fix was a
+direct reading of the constant and the feature's intent.
+
+_Fix committed separately on `bugfix/mixtape` (see `git log`)._
