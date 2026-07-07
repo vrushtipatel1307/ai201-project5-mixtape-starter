@@ -2,10 +2,6 @@
 
 ## AI Usage
 
-I used an AI assistant (Claude) throughout this project. Below is an honest account of
-where it helped, and — more importantly — where I had to verify its output or where a
-plausible-sounding answer would have led me wrong.
-
 **Codebase orientation (Milestone 1).** I had the assistant read through the `services/`
 and `routes/` layers and summarize each module's responsibility, and asked it to trace
 the request → route → service call chains (e.g. "how does listening to a song update a
@@ -42,7 +38,7 @@ tracing the call chain myself, then used the AI narrowly:
 
 **Verification I did myself.** Every fix was validated by running controlled inputs
 through the service and by running the `pytest` suite (15 tests, all passing — including
-the two I added for Issue #4) — not by asking the AI whether the fix looked correct.
+The two I added for Issue #4, not added by asking the AI whether the fix looked correct.
 
 ---
 
