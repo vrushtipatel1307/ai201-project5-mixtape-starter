@@ -2,14 +2,47 @@
 
 ## AI Usage
 
-_(To be completed in Milestone 4.)_
+I used an AI assistant (Claude) throughout this project. Below is an honest account of
+where it helped, and — more importantly — where I had to verify its output or where a
+plausible-sounding answer would have led me wrong.
 
-During Milestone 1 (orientation), I used an AI assistant to help read through the
-`services/` and `routes/` layers and summarize each module's responsibility, and to
-trace the request -> route -> service call chains documented in the codebase map below.
-I verified each summary by reading the source myself before writing it down. Any AI use
-during investigation and fixing will be disclosed per-bug in the root cause analysis
-entries and expanded in this section at the end.
+**Codebase orientation (Milestone 1).** I had the assistant read through the `services/`
+and `routes/` layers and summarize each module's responsibility, and asked it to trace
+the request → route → service call chains (e.g. "how does listening to a song update a
+streak?"). This was the strongest use: it's fast and reliable for explaining code that
+already exists. I checked every summary against the source before writing it into the
+codebase map — the map reflects what I confirmed, not what I was told.
+
+**Reproduction (Milestone 2).** I wrote small harness scripts (in a scratch directory,
+never committed) that call the service functions directly with controlled inputs, and
+used the assistant to help scaffold them quickly. The *decisions* came from running the
+code, not from the AI's predictions.
+
+- **Where AI would have led me wrong — Issue #3.** Both my initial plan and the obvious
+  "read the code" reasoning said the `outerjoin(song_tags)` in `search_songs` should
+  produce duplicate rows for multi-tag songs (the test file's own comment even says "bug
+  causes it to be 3"). Running it proved the opposite: SQLAlchemy 2.0's legacy
+  `Query.all()` auto-deduplicates full-entity rows, so no duplicates appear in this
+  environment and all search tests pass. This is the clearest example in the project of
+  why the "reproduce before fixing" discipline matters — the plausible diagnosis was
+  wrong until I ran it, and I dropped #3 from my fix set as a result.
+
+**Investigation and fixing (Milestone 3).** For each bug I found the suspect code by
+tracing the call chain myself, then used the AI narrowly:
+
+- **Issue #1:** after I had localized the failure to the `today.weekday() != 6` clause, I
+  asked the assistant to confirm the difference between `datetime.weekday()` (Sunday = 6)
+  and `isoweekday()` (Sunday = 7). I re-checked the return values in a REPL before
+  trusting them. I did *not* ask the AI "where is the streak bug?" — that kind of blind
+  question is exactly where it tends to sound confident and be wrong.
+- **Issues #2 and #5:** essentially no AI involvement in the diagnosis — the 24-hour
+  threshold and the `[:-1]` slice were self-evident once I read the relevant lines. I
+  used the assistant only to help write the verification scripts that confirmed both
+  sides of each boundary.
+
+**Verification I did myself.** Every fix was validated by running controlled inputs
+through the service and by running the existing `pytest` suite (13 tests, all passing) —
+not by asking the AI whether the fix looked correct.
 
 ---
 
