@@ -273,3 +273,35 @@ unaffected.
 direct reading of the constant and the feature's intent.
 
 _Fix committed separately on `bugfix/mixtape` (see `git log`)._
+
+### Issue #5 — The last song in a playlist never shows up
+
+**How I reproduced it.** Called `playlist_service.get_playlist_songs(playlist_id)` for
+all three seeded playlists and compared the result length to the raw `playlist_entries`
+row counts. Every playlist had **7** entries but the function returned **6**, and the
+missing one was always the song at the highest `position` (e.g. "Free Throws" at position
+7 in "Late Night Vibes").
+
+**How I found the root cause.** Traced `GET /playlists/<id>/songs`
+(`routes/playlists.py`) → `get_playlist_songs` in `services/playlist_service.py`. The
+query correctly selects the songs `order_by(asc(playlist_entries.c.position))`, so
+ordering was fine. The final line was
+`return [song.to_dict() for song in songs[:-1]]`. The `[:-1]` slice was the giveaway —
+it drops the last element of an already-correct, position-ordered list.
+
+**The root cause.** The list comprehension sliced the ordered result with `songs[:-1]`,
+which excludes the final element. Because the list is ordered by ascending playlist
+position, "the final element" is always the song with the highest position — so the last
+song added to any playlist was silently omitted from the response. There was no
+off-by-one in the query itself; the truncation was purely the stray slice.
+
+**My fix and side-effect check.** Changed the return to
+`[song.to_dict() for song in songs]` (removed the `[:-1]`). Verified all three playlists
+now return 7 songs, the previously-missing last song is present, and the ordering still
+matches ascending `position`. I also checked the empty-playlist edge case: with no
+entries the function returns `[]` and does not error (previously `[][:-1]` also gave `[]`,
+so that path is unchanged). `tests/test_playlists.py` (3 tests) passes.
+
+**AI use:** none; the `[:-1]` slice was self-evident once I read the return statement.
+
+_Fix committed separately on `bugfix/mixtape` (see `git log`)._
